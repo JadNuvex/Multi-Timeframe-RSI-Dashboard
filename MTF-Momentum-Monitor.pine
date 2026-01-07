@@ -1,0 +1,56 @@
+//@version=6
+indicator("Multi-Timeframe RSI Dashboard", overlay=true, scale=scale.none)
+
+// ========= SETTINGS ========= //
+rsiLength  = input.int(14, "RSI Length")
+overbought = input.int(70, "Overbought Level")
+oversold   = input.int(30, "Oversold Level")
+midLine    = 50 
+
+// Opacity set to 0 for solid colors
+bgExtremeSell = color.new(#8B0000, 0)  // Solid Dark Red
+bgBrightSell  = color.new(color.red, 0) // Solid Bright Red
+bgExtremeBuy  = color.new(#006400, 0)  // Solid Dark Green
+bgBrightBuy   = color.new(color.lime, 0) // Solid Bright Green
+bgNeutral     = color.new(color.gray, 0)   // Solid Gray
+
+// ========= TIMEFRAMES ========= //
+tfs = array.from("1", "2", "5", "10", "15", "30", "60", "120", "180", "240", "360", "720", "D", "W", "M")
+tfLabels = array.from("1m","2m","5m","10m","15m","30m","1h","2h","3h","4h","6h","12h","D","W","M")
+
+// ========= LOGIC FUNCTION ========= //
+getRsiColor() =>
+    r = ta.rsi(close, rsiLength)
+    lastOB  = ta.barssince(r >= overbought)
+    lastOS  = ta.barssince(r <= oversold)
+    lastMid = ta.barssince(ta.cross(r, midLine))
+    
+    color finalColor = bgNeutral
+    if r >= overbought
+        finalColor := bgExtremeSell
+    else if r <= oversold
+        finalColor := bgExtremeBuy
+    else if lastOB < lastMid and (nz(lastOS, 999999) > lastOB)
+        finalColor := bgBrightSell
+    else if lastOS < lastMid and (nz(lastOB, 999999) > lastOS)
+        finalColor := bgBrightBuy
+    else
+        finalColor := bgNeutral
+    finalColor
+
+// ========= TABLE (HORIZONTAL LAYOUT) ========= //
+// Swapped rows and columns: Now 16 columns and 2 rows
+var table t = table.new(position.top_right, array.size(tfs), 2, border_width=1)
+
+if barstate.islast
+    for i = 0 to array.size(tfs)-1
+        tf = array.get(tfs, i)
+        label = array.get(tfLabels, i)
+
+        c = request.security(syminfo.tickerid, tf, getRsiColor()[1], gaps=barmerge.gaps_off, lookahead=barmerge.lookahead_off)
+
+        // ROW 0: Timeframe Labels
+        table.cell(t, i, 0, label, bgcolor=color.gray, text_color=color.white, text_size=size.tiny)
+        
+        // ROW 1: RSI Colors
+        table.cell(t, i, 1, "", bgcolor=c, width=1.5, height=1.0)
